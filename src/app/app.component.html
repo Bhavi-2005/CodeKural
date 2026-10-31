@@ -1,0 +1,240 @@
+<div class="app-shell" [class.sidebar-collapsed]="sidebarCollapsed" [class.mobile-sidebar-open]="sidebarOpen">
+  <button *ngIf="sidebarOpen" class="drawer-scrim" type="button" aria-label="Close repository explorer" (click)="sidebarOpen=false"></button>
+
+  <div class="picker-backdrop" *ngIf="browseOpen" (click)="browseOpen=false">
+    <section class="repo-picker" role="dialog" aria-modal="true" aria-labelledby="repo-picker-title" (click)="$event.stopPropagation()">
+      <header class="picker-header"><div><span class="eyebrow">LOCAL WORKSPACE</span><h2 id="repo-picker-title">Choose a repository</h2></div><button class="icon-button" type="button" aria-label="Close folder picker" (click)="browseOpen=false">×</button></header>
+      <label class="choose-local-folder"><input class="folder-input" type="file" webkitdirectory directory multiple (change)="uploadLocalFolder($event)" aria-label="Choose a folder to import" [disabled]="busy"><span aria-hidden="true">▣</span><span><strong>Choose a folder from this computer</strong><small>Copies the selected folder into this local app for browsing.</small></span><span class="picker-entry-action">Choose folder ↗</span></label>
+      <form class="picker-search" (ngSubmit)="searchRepositories()"><label for="repo-search">Or search configured workspaces</label><div><input id="repo-search" name="browseSearch" type="search" [(ngModel)]="browseSearch" placeholder="Search by repository or folder name"><button class="connect-button" type="submit" [disabled]="browseLoading">Search</button></div><small>Folder search is limited to the backend’s configured workspace roots.</small></form>
+      <div class="picker-location"><span aria-hidden="true">⌂</span><span [title]="browsePath || 'Configured workspace folders'">{{browsePath || 'Configured workspace folders'}}</span><button *ngIf="browsePath && !browseSearch" type="button" (click)="browseParentPath ? loadBrowse(browseParentPath) : loadBrowse()">Up one folder</button><button *ngIf="browseSearch" type="button" (click)="browseSearch=''; loadBrowse()">Clear search</button></div>
+      <div class="picker-content" aria-live="polite">
+        <p class="picker-message" *ngIf="browseLoading"><span class="spinner"></span>Searching local folders…</p>
+        <p class="picker-error" *ngIf="browseError">{{browseError}}</p>
+        <button class="picker-entry" type="button" *ngFor="let entry of browseEntries" (click)="pickBrowseEntry(entry)" [class.repo-entry]="entry.is_repository" [title]="entry.path">
+          <span class="picker-entry-icon" aria-hidden="true">{{entry.is_repository ? '⌘' : '📁'}}</span><span class="picker-entry-copy"><strong>{{entry.name}}</strong><small>{{entry.path}}</small></span><span class="picker-entry-action">{{entry.is_repository ? 'Select repository' : 'Open folder'}} <span aria-hidden="true">›</span></span>
+        </button>
+        <p class="picker-message" *ngIf="!browseLoading && !browseError && !browseEntries.length">{{browseSearch ? 'No repositories matched that search.' : 'No folders found here.'}}</p>
+      </div>
+      <footer class="picker-footer"><span>Folder browsing follows the backend’s configured workspace roots.</span><button type="button" class="quiet-button" (click)="browseOpen=false">Cancel</button></footer>
+    </section>
+  </div>
+
+  <aside class="sidebar" aria-label="Repository explorer">
+    <div class="brand-row">
+      <div class="brand" aria-label="CodeKural">
+        <span class="brand-mark" aria-hidden="true">&lt;/&gt;</span>
+        <span class="brand-copy"><strong>codekural</strong><small>CODE HISTORY WORKSPACE</small></span>
+      </div>
+      <button class="icon-button collapse-button" type="button" [attr.aria-label]="sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'" [attr.aria-expanded]="!sidebarCollapsed" (click)="sidebarCollapsed=!sidebarCollapsed"><span aria-hidden="true">{{sidebarCollapsed ? '›' : '‹'}}</span></button>
+      <button class="icon-button mobile-close" type="button" aria-label="Close repository explorer" (click)="sidebarOpen=false"><span aria-hidden="true">×</span></button>
+    </div>
+
+    <button class="new-button" type="button" (click)="newInvestigation()" [disabled]="busy" aria-label="New investigation">
+      <span class="new-icon" aria-hidden="true">＋</span><span class="nav-copy">New investigation</span><span class="new-shortcut nav-copy">⌘ N</span>
+    </button>
+
+    <div class="sidebar-section repo-section">
+      <div class="section-heading"><span>WORKSPACE</span><span class="section-kicker">01</span></div>
+      <div class="repo-form"><label>Local Git repository</label><button class="connect-button browse-button" type="button" (click)="openRepositoryPicker()" [disabled]="loadingAction==='connect'"><span class="connect-dot" aria-hidden="true"></span>{{loadingAction==='connect' ? 'Connecting…' : repo ? 'Choose another repository' : 'Choose a local repository'}}</button></div>
+      <div class="repository-card" *ngIf="repo" aria-live="polite">
+        <span class="repo-symbol" aria-hidden="true">⌘</span>
+        <span class="repo-details"><strong [title]="repo.name">{{repo.name}}</strong><small>{{repo.current_branch || 'branch unavailable'}}<span class="repo-separator">·</span>{{files.length}} files</small></span>
+        <span class="connected-mark" role="img" aria-label="Connected"></span>
+      </div>
+    </div>
+
+    <div class="sidebar-section source-section">
+      <div class="section-heading"><span>SOURCE FILES</span><span class="count-pill" *ngIf="repo">{{files.length}}</span></div>
+      <label class="search-box" for="file-search">
+        <span class="search-icon" aria-hidden="true"></span>
+        <input id="file-search" name="fileSearch" type="search" [(ngModel)]="fileSearch" [disabled]="!repo || !files.length" placeholder="Find a file">
+        <kbd>/</kbd>
+      </label>
+      <div class="file-list" *ngIf="repo && files.length" role="list" aria-label="Source files">
+        <button class="file-item" type="button" role="listitem" *ngFor="let file of visibleFiles" [class.active]="selectedFile===file.path" [disabled]="busy" (click)="selectFile(file.path)" [title]="file.path">
+          <span class="file-type">{{file.path.split('.').pop()?.toUpperCase()}}</span><span class="file-path">{{file.path}}</span>
+        </button>
+        <p class="list-empty" *ngIf="!visibleFiles.length">No files match “{{fileSearch}}”.</p>
+      </div>
+      <div class="sidebar-empty" *ngIf="!repo"><span class="empty-glyph" aria-hidden="true">⌕</span><p>Connect a local repository to browse its source.</p></div>
+      <div class="sidebar-empty" *ngIf="repo && !files.length"><span class="empty-glyph" aria-hidden="true">∅</span><p>No supported source files found in this repository.</p><small>Try another local Git repository or check its tracked and untracked files.</small></div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="privacy-row"><span class="privacy-glyph" aria-hidden="true">◈</span><span>Source stays local until you request an AI explanation.</span></div>
+      <div class="sidebar-version"><span class="version-dot"></span> CodeKural <span>v1.0</span></div>
+    </div>
+  </aside>
+
+  <header class="topbar">
+    <button class="icon-button mobile-menu" type="button" aria-label="Open repository explorer" [attr.aria-expanded]="sidebarOpen" (click)="sidebarOpen=true"><span aria-hidden="true">☰</span></button>
+    <div class="top-context">
+      <div class="repository-context" *ngIf="repo; else noRepository"><span class="context-repo-icon" aria-hidden="true">⌘</span><strong [title]="repo.name">{{repo.name}}</strong><span class="branch-separator">/</span><span class="branch-name">{{repo.current_branch || 'branch unavailable'}}</span><span class="top-status connected">Connected</span></div>
+      <ng-template #noRepository><div class="repository-context empty-context"><span class="context-repo-icon" aria-hidden="true">⌘</span><span>No repository connected</span><small>Connect one from the explorer</small></div></ng-template>
+      <div class="file-context" *ngIf="selectedFile"><span aria-hidden="true">›</span>{{selectedFile}}</div>
+    </div>
+    <div class="top-controls">
+      <label class="language-control"><span>OUTPUT</span><select [(ngModel)]="language" (ngModelChange)="languageChanged()" aria-label="Explanation output language"><option value="en">English</option><option value="ta">தமிழ்</option></select></label>
+      <span class="top-status" [class.configured]="aiConfigured" [class.unconfigured]="healthChecked && !aiConfigured" [class.status-loading]="!healthChecked" [attr.title]="aiConfigured ? 'Sarvam is configured' : healthChecked ? 'Set SARVAM_API_KEY in the backend .env file' : 'Checking backend configuration'">
+        <span class="status-light"></span>{{!healthChecked ? 'Checking Sarvam' : aiConfigured ? 'Sarvam ready' : 'Sarvam not configured'}}
+      </span>
+    </div>
+  </header>
+
+  <section class="code-panel" aria-label="Code workspace">
+    <ng-container *ngIf="selectedFile; else noFile">
+      <div class="code-toolbar">
+        <div class="file-heading-main">
+          <div class="breadcrumbs"><span>{{repo?.name}}</span><span aria-hidden="true">/</span><strong [title]="selectedFile">{{selectedFile}}</strong></div>
+          <div class="file-meta"><span class="language-badge">{{currentExtension}}</span><span>{{lineCount | number}} lines</span><span class="meta-separator">·</span><span>{{history.length | number}} commits in file history</span></div>
+        </div>
+        <button class="quiet-button" type="button" (click)="newInvestigation()" [disabled]="busy" title="Clear the current answer">New query</button>
+      </div>
+
+      <div class="code-viewport" [attr.aria-busy]="loadingAction==='file'">
+        <div class="code-message" *ngIf="loadingAction==='file'"><span class="spinner"></span>Loading source and Git history…</div>
+        <div class="code-lines" *ngIf="loadingAction!=='file'" role="list" aria-label="Source code with line numbers">
+          <div class="code-row" role="listitem" *ngFor="let number of lineNumbers" [class.line-selected]="number>=startLine && number<=endLine">
+            <span class="line-number" aria-hidden="true">{{number}}</span><span class="line-content">{{sourceLines[number-1] || ' '}}</span>
+          </div>
+        </div>
+        <div class="code-truncation" *ngIf="lineCount>lineNumbers.length">Showing lines around your selection. Use the line range to jump through this file.</div>
+      </div>
+
+      <div class="selection-bar">
+        <div class="selection-copy"><span class="selection-mark" aria-hidden="true">⌖</span><div><strong>Code range</strong><small>Choose the lines to investigate</small></div></div>
+        <div class="line-controls">
+          <label>From<input type="number" min="1" [max]="lineCount" [(ngModel)]="startLine" (ngModelChange)="updateCodeWindow()" [disabled]="busy" aria-label="First selected line"></label>
+          <span class="range-dash" aria-hidden="true">—</span>
+          <label>To<input type="number" min="1" [max]="lineCount" [(ngModel)]="endLine" (ngModelChange)="updateCodeWindow()" [disabled]="busy" aria-label="Last selected line"></label>
+          <span class="selected-count" [class.invalid-count]="!lineRangeValid">{{selectedCount}} selected</span>
+        </div>
+      </div>
+    </ng-container>
+
+    <ng-template #noFile>
+      <div class="workspace-empty">
+        <div class="empty-icon" aria-hidden="true">&lt;/&gt;</div>
+        <span class="eyebrow">CODE INVESTIGATION</span>
+        <h1>{{repo ? 'Choose a source file' : 'Your code, with its history'}}</h1>
+        <p>{{repo ? (files.length ? 'Select a file in the explorer to inspect its source and Git history.' : 'No supported files were returned. Reconnect a repository that contains Python, JavaScript, TypeScript, Java, C or C++ source.') : 'Connect a local Git repository to begin tracing why a code decision exists.'}}</p>
+        <div class="empty-note" *ngIf="!aiConfigured"><span class="status-light"></span>Repository browsing is available. Configure Sarvam on the backend to generate explanations.</div>
+      </div>
+    </ng-template>
+  </section>
+
+  <aside class="investigation-panel" aria-label="AI investigation">
+    <div class="investigation-scroll">
+      <div class="panel-title-row"><div><span class="eyebrow">SARVAM · CODE HISTORY</span><h2>Investigation</h2></div><span class="model-tag" *ngIf="aiConfigured">AI</span></div>
+
+      <div class="error-card" *ngIf="error" role="alert"><span class="error-icon" aria-hidden="true">!</span><div><strong>Action needs attention</strong><p>{{error}}</p><button class="text-action" type="button" *ngIf="selectedFile && aiConfigured && lastFailedAction" (click)="retryFailedAction()" [disabled]="busy">{{lastFailedAction==='test' ? 'Retry test suggestion' : 'Retry investigation'}}</button></div></div>
+
+      <form class="question-form" (ngSubmit)="investigate()">
+        <label for="investigation-question">What do you want to understand?</label>
+        <textarea id="investigation-question" name="question" [(ngModel)]="question" (ngModelChange)="investigationInputsChanged()" rows="3" maxlength="1000" placeholder="Why was this condition added?" [disabled]="!selectedFile || busy"></textarea>
+        <div class="question-footer"><span>{{selectedFile ? selectedCount + ' lines selected' : 'Select a file to ask about its code'}}</span><span>{{question.length}} / 1000</span></div>
+        <label class="dependency-depth-control" for="dependency-depth">Related file depth <select id="dependency-depth" name="dependencyDepth" [(ngModel)]="dependencyDepth"><option [ngValue]="0">Selected file only</option><option [ngValue]="1">1 import level</option><option [ngValue]="2">2 import levels</option><option [ngValue]="3">3 import levels</option><option [ngValue]="4">4 import levels</option><option [ngValue]="5">5 import levels</option></select></label>
+        <button class="primary-button" type="submit" [disabled]="!repo || !selectedFile || busy || !aiConfigured || !question.trim() || !lineRangeValid">
+          <span class="button-icon" aria-hidden="true">⌕</span>{{loadingAction==='investigation' ? 'Investigating…' : 'Investigate code'}}<span class="button-arrow" aria-hidden="true">↗</span>
+        </button>
+        <p class="setup-hint" *ngIf="healthChecked && !aiConfigured">Set <code>SARVAM_API_KEY</code> in the backend <code>.env</code>. The secret never belongs in the browser.</p>
+        <p class="privacy-copy" *ngIf="aiConfigured">Selected code and related repository evidence are sent to Sarvam for this request.</p>
+      </form>
+
+      <div class="operation-state" *ngIf="busy" aria-live="polite"><span class="spinner"></span><div><strong>{{loadingAction==='file' ? 'Loading file' : loadingAction==='test' ? 'Preparing test suggestion' : loadingAction==='connect' ? 'Connecting repository' : 'Investigating code'}}</strong><small>{{working}}</small></div></div>
+
+      <ng-container *ngIf="result">
+        <div class="response-warning" role="status" *ngIf="result.render_warnings.length"><strong>Response needs review</strong><span *ngFor="let warning of result.render_warnings">{{warning}}</span></div>
+        <section class="answer-section" aria-labelledby="answer-title">
+          <div class="answer-heading"><span class="result-label"><span class="result-symbol" aria-hidden="true">✳</span> ANSWER</span><span class="evidence-status" [class.status-partial]="result.evidence_status==='partial'" [class.status-missing]="result.evidence_status==='missing' || result.history_status==='insufficient'">{{result.evidence_status}} · {{result.history_status==='insufficient' ? 'insufficient history' : result.history_status}}</span></div>
+          <h3 id="answer-title">{{result.summary}}</h3>
+          <div class="reference-list summary-references"><a *ngFor="let item of evidenceFor(result.summary_evidence_references)" [href]="'#evidence-'+item.id" class="reference-chip">{{item.id}}<span>{{item.location}}</span></a></div>
+          <p class="answer-meta">{{result.history.commit_count}} file-history commits · {{result.history.line_trace.length}} selected-line changes traced<span *ngIf="result.history.shallow"> · shallow clone</span><span *ngIf="result.history.empty"> · no commit history for this file</span><span *ngIf="result.history.insufficient"> · insufficient history to establish origin</span></p>
+        </section>
+
+        <section class="claim-section" aria-labelledby="observations-title">
+          <div class="section-title"><span class="fact-indicator"></span><h3 id="observations-title">Source observations</h3><span class="claim-count">{{result.source_observations.length}}</span></div>
+          <article class="claim-card fact-card" *ngFor="let item of result.source_observations">
+            <p>{{item.text || 'This source observation is missing its statement in the API response.'}}</p>
+            <small class="classification-badge">SOURCE_FACT</small>
+            <small class="claim-location">{{sourceObservationLocation(item)}}</small>
+            <p class="claim-explanation">{{sourceObservationExplanation(item)}}</p>
+            <div class="reference-list"><a *ngFor="let evidence of evidenceFor(item.evidence_references)" [href]="'#evidence-'+evidence.id" class="reference-chip">{{evidence.id}}<span>{{evidence.location}}</span></a><span class="reference-fallback" *ngIf="!evidenceFor(item.evidence_references).length">No matching evidence reference is available.</span></div>
+          </article>
+          <p class="section-empty" *ngIf="!result.source_observations.length">No source observations were returned.</p>
+        </section>
+
+        <section class="claim-section" aria-labelledby="history-facts-title">
+          <div class="section-title"><span class="fact-indicator"></span><h3 id="history-facts-title">Verified historical facts</h3><span class="claim-count">{{result.historical_facts.length}}</span></div>
+          <article class="claim-card fact-card" *ngFor="let fact of result.historical_facts"><p>{{fact.text}}</p><div class="reference-list"><a *ngFor="let item of evidenceFor(fact.evidence_references)" [href]="'#evidence-'+item.id" class="reference-chip">{{item.id}}<span>{{item.location}}</span></a></div></article>
+          <p class="section-empty" *ngIf="!result.historical_facts.length">No historical fact could be verified from the available Git evidence.</p>
+        </section>
+
+        <section class="claim-section" aria-labelledby="hypotheses-title">
+          <div class="section-title"><span class="hypothesis-indicator"></span><h3 id="hypotheses-title">Hypotheses</h3><span class="claim-count">{{result.hypotheses.length}}</span></div>
+          <article class="claim-card hypothesis-card" *ngFor="let hypothesis of result.hypotheses">
+            <p>{{hypothesis.hypothesis_text || 'This hypothesis is missing its statement in the API response.'}}</p>
+            <small class="classification-badge">{{hypothesis.hypothesis_type || 'UNKNOWN_CLASSIFICATION'}}</small>
+            <small class="hypothesis-meta">{{hypothesis.testability ? 'Testable' : 'Not testable by regression test'}} · {{hypothesis.hypothesis_id || 'ID unavailable'}}</small>
+            <p class="hypothesis-validation"><strong>Validation method</strong> · {{hypothesis.validation_method || 'Validation method was not provided.'}}</p>
+            <p class="test-limitations"><strong>Limitations</strong> · {{hypothesis.limitations || 'Limitations were not provided.'}}</p>
+            <div class="reference-list"><a *ngFor="let item of evidenceFor(hypothesis.evidence_references)" [href]="'#evidence-'+item.id" class="reference-chip">{{item.id}}<span>{{item.location}}</span></a><span class="reference-fallback" *ngIf="!evidenceFor(hypothesis.evidence_references).length">No matching evidence reference is available.</span></div>
+            <small class="proposal-available" *ngIf="testSuggestion?.hypothesis_id===hypothesis.hypothesis_id">The actual test proposal is shown below.</small>
+            <button class="secondary-button" type="button" (click)="selectHypothesis(hypothesis)" [disabled]="busy || (hypothesis.testability && !aiConfigured && !hypothesis.test_proposal)">{{hypothesis.test_proposal ? 'View test proposal' : hypothesisAction(hypothesis)}}<span aria-hidden="true">→</span></button>
+          </article>
+          <p class="section-empty" *ngIf="!result.hypotheses.length">No technical inference was needed.</p>
+        </section>
+
+        <section class="unknown-section contradiction-section" *ngIf="result.contradictions.length" aria-labelledby="contradictions-title">
+          <div class="section-title"><span class="unknown-indicator">!</span><h3 id="contradictions-title">Conflicting evidence</h3></div>
+          <article class="claim-card" *ngFor="let conflict of result.contradictions"><p>{{conflict.description}}</p><small>Why it matters: {{conflict.why_it_matters}}</small><div class="reference-list"><a *ngFor="let item of evidenceFor(conflict.evidence_references)" [href]="'#evidence-'+item.id" class="reference-chip">{{item.id}}<span>{{item.location}}</span></a></div></article>
+        </section>
+
+        <section class="scope-note" aria-label="Repository scan scope"><strong>Repository context</strong><span>{{result.analysis_scope.files_inspected}} / {{result.analysis_scope.files_available}} source, test, and documentation files inspected · import depth {{result.analysis_scope.dependency_depth}}</span><small>{{result.analysis_scope.complete ? 'Scan completed within the listed file types.' : 'Partial scan: claims are limited to the inspected files.'}} {{result.analysis_scope.evidence_complete ? '' : 'Evidence selection was capped.'}} {{result.analysis_scope.scope_description}}<span *ngIf="result.analysis_scope.symbols_traced.length"> Symbols traced: {{result.analysis_scope.symbols_traced.join(', ')}}</span></small>
+          <details><summary>Test discovery · {{result.analysis_scope.test_discovery.total_test_files_found}} files · {{result.analysis_scope.test_discovery.counts.DIRECT}} direct · {{result.analysis_scope.test_discovery.counts.INDIRECT}} indirect · {{result.analysis_scope.test_discovery.counts.UNRELATED}} unrelated · {{result.analysis_scope.test_discovery.counts.UNKNOWN}} unknown</summary>
+            <p>Static discovery only · execution not performed · Coverage: {{result.analysis_scope.test_discovery.coverage_status==='measured' ? result.analysis_scope.test_discovery.coverage_percent + '% from ' + result.analysis_scope.test_discovery.coverage_report_path : 'Not measured'}}</p>
+            <ul><li *ngFor="let item of result.analysis_scope.test_discovery.references"><strong>{{item.classification}}</strong> · {{item.path}} · {{item.test_names.join(', ') || 'unclassified test file'}} · lines {{item.line_ranges.join(', ') || 'unavailable'}} · {{item.relationship_reason}} · {{item.evidence_references.join(', ')}}</li></ul>
+          </details>
+          <details *ngIf="result.analysis_scope.inspected_paths.length"><summary>Inspected files ({{result.analysis_scope.inspected_paths.length}})</summary><ul><li *ngFor="let path of result.analysis_scope.inspected_paths">{{path}}</li></ul></details><details *ngIf="result.analysis_scope.files_skipped.length"><summary>Skipped files ({{result.analysis_scope.files_skipped_count}} total; showing {{result.analysis_scope.files_skipped.length}})</summary><ul><li *ngFor="let item of result.analysis_scope.files_skipped">{{item.path}} · {{item.reason}}</li></ul></details></section>
+
+        <section class="unknown-section" *ngIf="result.unknowns.length" aria-labelledby="unknown-title">
+          <div class="section-title"><span class="unknown-indicator">?</span><h3 id="unknown-title">Still unknown</h3></div>
+          <ul><li *ngFor="let unknown of result.unknowns">{{unknown}}</li></ul>
+        </section>
+
+        <section class="evidence-section" aria-labelledby="evidence-title">
+          <div class="section-title"><span class="evidence-indicator" aria-hidden="true">≡</span><h3 id="evidence-title">Evidence trail</h3><span class="claim-count">{{result.evidence.length}}</span></div>
+          <ng-container *ngFor="let group of evidenceGroups()"><h4 class="evidence-category-heading">{{group.category.replace('_', ' ')}} · {{group.items.length}}</h4><article class="evidence-card" *ngFor="let item of group.items" [id]="'evidence-'+item.id">
+            <div class="evidence-heading"><span class="evidence-id">{{item.id}}</span><span class="evidence-type">{{item.type}}</span><a *ngIf="item.url" [href]="item.url" target="_blank" rel="noopener noreferrer" class="open-reference">Open commit ↗</a></div>
+            <strong class="evidence-location" [title]="item.location">{{item.location}}</strong>
+            <p class="evidence-reason">{{item.relevance_reason}}</p>
+            <details><summary>View evidence</summary><pre>{{item.excerpt}}</pre></details>
+          </article></ng-container>
+          <p class="section-empty" *ngIf="!result.evidence.length">No repository evidence was returned.</p>
+        </section>
+
+        <section class="test-section" aria-labelledby="test-title" *ngIf="activeHypothesis || testSuggestion">
+          <div class="test-action-row"><div><span class="eyebrow">NEXT STEP</span><h3 id="test-title">{{activeHypothesis ? hypothesisAction(activeHypothesis) : 'Test proposal'}}</h3><p>{{activeHypothesis?.hypothesis_text}}</p></div><button class="secondary-button" type="button" *ngIf="activeHypothesis?.testability && !activeHypothesis?.test_proposal" (click)="suggestTest()" [disabled]="busy || !aiConfigured">{{loadingAction==='test' ? 'Preparing…' : 'Retry test proposal'}}<span aria-hidden="true">→</span></button></div>
+          <p class="test-limitations" *ngIf="hypothesisNotice">{{hypothesisNotice}}</p>
+          <div class="test-result" *ngIf="testSuggestion">
+            <div class="test-result-heading"><strong>Suggested test · {{testSuggestion.test_framework}}</strong><span class="not-run">{{testSuggestion.execution_status}}</span></div>
+            <dl><dt>Purpose</dt><dd>{{testSuggestion.purpose}}</dd><dt>Expected behavior</dt><dd>{{testSuggestion.expected_behavior}}</dd><dt>Hypothesis tested</dt><dd>{{testSuggestion.hypothesis_tested}}</dd></dl>
+            <p class="test-limitations"><strong>Test type</strong> · {{testSuggestion.test_type.replace('_', ' ')}}</p>
+            <div class="code-block-heading"><span>TEST CODE</span><button type="button" class="copy-button" (click)="copyTest()" [disabled]="!testSuggestion.test_code">{{testCopied ? 'Copied' : 'Copy code'}}</button></div>
+            <pre class="suggested-code">{{testSuggestion.test_code}}</pre>
+            <ul class="test-objectives"><li *ngFor="let objective of testSuggestion.test_objectives"><strong>{{objective.test_type.replace('_', ' ')}}</strong> · {{objective.description}} <span *ngIf="!objective.testable">(not testable by running this code)</span><span *ngFor="let item of evidenceFor(objective.evidence_references)"> · {{item.id}}</span></li></ul>
+            <p class="test-limitations"><strong>Limitations</strong> · {{testSuggestion.limitations}}</p>
+            <div class="reference-list"><a *ngFor="let item of evidenceFor(testSuggestion.evidence_references)" [href]="'#evidence-'+item.id" class="reference-chip">{{item.id}}<span>{{item.location}}</span></a></div>
+          </div>
+        </section>
+      </ng-container>
+
+      <div class="result-empty" *ngIf="!result && !busy && !error">
+        <span class="empty-result-icon" aria-hidden="true">⌕</span>
+        <strong>{{selectedFile ? 'Ready to investigate' : 'Your evidence-backed answer will appear here'}}</strong>
+        <p>{{selectedFile ? 'Ask a question about the selected lines. Facts, hypotheses, and unknowns will be separated.' : 'Connect a repository and select code to start an investigation.'}}</p>
+        <div class="empty-proof"><span class="proof-dot"></span> Evidence before explanation</div>
+      </div>
+    </div>
+  </aside>
+</div>

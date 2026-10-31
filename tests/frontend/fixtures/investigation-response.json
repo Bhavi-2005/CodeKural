@@ -1,0 +1,74 @@
+{
+  "summary": "The investigation response structure is defined in the Investigation interface.",
+  "summary_evidence_references": ["E01"],
+  "source_observations": [
+    {
+      "text": "The `Investigation` interface declares `source_observations` as `(Claim & { classification?: 'SOURCE_FACT' })[]` and `hypotheses` as `Hypothesis[]`.",
+      "evidence_references": ["E01"],
+      "classification": "SOURCE_FACT"
+    }
+  ],
+  "historical_facts": [],
+  "hypotheses": [
+    {
+      "hypothesis_id": "HFD365E60",
+      "hypothesis_text": "BEHAVIORAL_HYPOTHESIS is used for falsifiable runtime input/output predictions.",
+      "hypothesis_type": "BEHAVIORAL_HYPOTHESIS",
+      "testability": true,
+      "evidence_references": ["E01"],
+      "validation_method": "Write a regression test for the cited observable behavior and its supported boundary conditions.",
+      "limitations": "A passing test describes behavior under its inputs; it does not prove the developer's original intent."
+    },
+    {
+      "hypothesis_id": "H6B973BE0",
+      "hypothesis_text": "TECHNICAL_HYPOTHESIS is used for implementation or dependency consequences.",
+      "hypothesis_type": "TECHNICAL_HYPOTHESIS",
+      "testability": true,
+      "evidence_references": ["E01"],
+      "validation_method": "Use a focused test or controlled mock to check the cited configuration, invocation, caching, or dependency interaction.",
+      "limitations": "The result is limited to the inspected dependency versions and test setup."
+    }
+  ],
+  "unknowns": [],
+  "contradictions": [],
+  "evidence_status": "partial",
+  "history_status": "missing",
+  "analysis_scope": {
+    "files_available": 19,
+    "files_inspected": 19,
+    "complete": true,
+    "evidence_complete": true,
+    "files_skipped_count": 0,
+    "related_tests_found": false,
+    "symbols_traced": ["Investigation", "Claim", "Hypothesis"],
+    "scope_description": "Current tracked and non-ignored repository context.",
+    "dependency_depth": 1,
+    "inspected_paths": ["src/app/app.component.ts"],
+    "files_skipped": [],
+    "category_counts": {"A_source": 1},
+    "test_discovery": {
+      "total_test_files_found": 1,
+      "references": [
+        {"test_id": "tests/frontend/test_rendering.mjs::test_mapping#1", "path": "tests/frontend/test_rendering.mjs", "test_names": ["test_mapping"], "line_ranges": ["1"], "classification": "UNRELATED", "relationship_reason": "No relationship was established by static analysis.", "evidence_references": []}
+      ],
+      "counts": {"DIRECT": 0, "INDIRECT": 0, "UNRELATED": 1, "UNKNOWN": 0},
+      "coverage_status": "not_measured",
+      "coverage_percent": null,
+      "coverage_report_path": null,
+      "coverage_unknown": true
+    }
+  },
+  "evidence": [
+    {
+      "id": "E01",
+      "type": "source",
+      "category": "A_source",
+      "location": "src/app/app.component.ts:11-16",
+      "path": "src/app/app.component.ts",
+      "line_range": "11-16",
+      "excerpt": "interface Claim { text: string; evidence_references: string[]; }\ninterface Hypothesis { hypothesis_text: string; hypothesis_type: HypothesisType; testability: boolean; }\ninterface Investigation { source_observations: Claim[]; hypotheses: Hypothesis[]; }",
+      "relevance_reason": "Selected current source lines for the investigation response types."
+    }
+  ],
+  "history": {"commit_count": 0, "shallow": false, "empty": true, "insufficient": true, "commits": [], "line_trace": []}
+}

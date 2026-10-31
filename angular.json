@@ -1,0 +1,17 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "newProjectRoot": "projects",
+  "projects": {
+    "codekural": {
+      "projectType": "application",
+      "root": "",
+      "sourceRoot": "src",
+      "prefix": "ck",
+      "architect": {
+        "build": {"builder": "@angular-devkit/build-angular:application", "options": {"outputPath": "dist/codekural", "index": "src/index.html", "browser": "src/main.ts", "polyfills": ["zone.js"], "tsConfig": "tsconfig.app.json", "styles": ["src/styles.css"]}, "configurations": {"production": {"optimization": true, "outputHashing": "all"}, "development": {"optimization": false, "extractLicenses": false, "sourceMap": true}}, "defaultConfiguration": "production"},
+        "serve": {"builder": "@angular-devkit/build-angular:dev-server", "configurations": {"production": {"buildTarget": "codekural:build:production"}, "development": {"buildTarget": "codekural:build:development"}}, "defaultConfiguration": "development"}
+      }
+    }
+  }
+}

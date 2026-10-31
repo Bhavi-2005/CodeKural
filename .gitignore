@@ -1,0 +1,15 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.angular/
+node_modules/
+dist/
+.pytest_cache/
+.pytest-tmp/
+.frontend-test-build/
+
+# Local test scratch repositories and temporary runs
+.pytest-*/
+backend/.pytest-*/
+pytest-cache-files-*/
